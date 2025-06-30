@@ -55,9 +55,7 @@ try:
 except ImportError:  # pragma: no cover
     YouTubeTranscriptApi = None
 
-# Removed tiktoken - not currently used
-
-# Unified DuckDuckGo search helper ------------------------------------------------
+# ─── Unified DuckDuckGo Search Helper ───────────────────────────────────────
 
 def _ddg_search(query: str, max_results: int = 5) -> List[dict]:
     """Return DuckDuckGo search results using whichever API variant is available.
@@ -164,7 +162,7 @@ def _ddg_search(query: str, max_results: int = 5) -> List[dict]:
     logger.error(f"All DuckDuckGo search methods failed for query '{query[:50]}...'")
     return []
 
-# Twitter/X redirect URL detection and resolution
+# ─── Twitter/X Redirect URL Resolution ──────────────────────────────────────
 async def _resolve_twitter_redirect(url: str) -> str:
     """Resolve Twitter/X redirect URLs to actual Twitter/X URLs.
     
@@ -381,7 +379,7 @@ def _sanitize_for_log(text: str) -> str:
         '🎪': '[CIRCUS]',
         '🏆': '[TROPHY]',
         '🎖️': '[MEDAL]',
-        '🏅': '[MEDAL]',
+        '🏅': '[GOLD_MEDAL]',
         '🎨': '[ART]',
         '📚': '[BOOKS]',
         '💰': '[MONEY]',
@@ -390,7 +388,6 @@ def _sanitize_for_log(text: str) -> str:
         '📻': '[RADIO]',
         '☀️': '[SUN]',
         '🌙': '[MOON]',
-        '⭐': '[STAR]',
         '🌟': '[SPARKLE]',
         '💫': '[DIZZY]',
         '🌈': '[RAINBOW]',
@@ -781,7 +778,6 @@ def _remember(user_id: int, role: str, content: str):
 
 # ─── Video/Audio Processing Helpers ──────────────────────────────────────────
 
-# yt-dlp configuration for audio extraction and video info
 def _get_ytdl_opts():
     """Get basic yt_dlp options without authentication"""
     return {
@@ -1418,9 +1414,8 @@ async def _extract_twitter_media(url: str) -> tuple[List[str], List[str]]:
 # ─── Search Commands ─────────────────────────────────────────────────────────
 # NOTE: Search command has been moved to search.py for better organization
 
-# ─── Summarize URL / YouTube Command ──────────────────────────────────────
+# ─── Summarize URL / YouTube Helper ─────────────────────────────────────────
 
-# Helper to fetch textual content for summarization
 async def _get_content_text(url: str) -> str:
     """Download and return text content from a web page or YouTube video."""
     if any(domain in url for domain in ("youtube.com", "youtu.be")):
@@ -1532,7 +1527,8 @@ async def _get_content_text(url: str) -> str:
                 logger.error(error_msg)
             except Exception:
                 logger.error("Failed to fetch YouTube content - logging error occurred")
-    # ------------- X (Twitter) single-post fetch -----------------------------
+    
+    # X (Twitter) single-post fetch
     # First resolve any Twitter/X redirect URLs
     resolved_url = await _resolve_twitter_redirect(url)
     if resolved_url != url:
@@ -1657,7 +1653,8 @@ async def _get_content_text(url: str) -> str:
             logger.error(f"Failed to fetch Twitter/X content from {url}", exc_info=e)
             return f"[X/Twitter post from {url} - extraction failed: {str(e)}]"
 
-    # ------------- Wikipedia -------------------------------------------------
+    
+    # Wikipedia
     if re.search(r"wikipedia\.org/wiki/", url):
         try:
             title = url.split("/wiki/")[-1]
@@ -1669,7 +1666,8 @@ async def _get_content_text(url: str) -> str:
         except Exception:
             pass  # fall back to generic fetch
 
-    # ------------- Generic HTML fetch ---------------------------------------
+    
+    # Generic HTML fetch
     try:
         async with aiohttp.ClientSession() as sess:
             async with sess.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
@@ -2108,8 +2106,12 @@ async def on_message(message: discord.Message):
     # Ignore own messages to prevent infinite loops
     if message.author == bot.user:
         return
+
+    # Skip auto-reason for replies to the bot
+    if message.reference and getattr(message.reference, "resolved", None) and isinstance(message.reference.resolved, discord.Message) and message.reference.resolved.author == bot.user:
+        return await bot.process_commands(message)
     
-    # Check for bot mention in replies (alias for ^reason -m)
+    # Check for bot mention in replies (alias for ^reason -s for auto-search)
     if bot.user and bot.user.mentioned_in(message) and message.reference:
         try:
             # Extract content after removing bot mention
@@ -2126,16 +2128,16 @@ async def on_message(message: discord.Message):
             for pattern in mention_patterns:
                 content = content.replace(pattern, "").strip()
             
-            # If content is empty after removing mentions, provide default prompt
+            # If content is empty after removing mentions, skip auto-search trigger
             if not content:
-                content = "Is this accurate? Please analyze the content."
+                return await bot.process_commands(message)
             
-            logger.info(f"Bot mention detected in reply from {message.author} - triggering reason -m with content: '{content[:100]}...'")
+            logger.info(f"Bot mention detected in reply from {message.author} - triggering reason -s (auto-search) with content: '{content[:100]}...'")
             
             # Create a new message object with the reason command
-            # We'll modify the message content to simulate the reason -m command
+            # We'll modify the message content to simulate the reason -s command (auto-search)
             original_content = message.content
-            message.content = f"{PREFIX}reason -m {content}"
+            message.content = f"{PREFIX}reason -s {content}"
             
             try:
                 # Get context and invoke the reason command
@@ -2144,7 +2146,7 @@ async def on_message(message: discord.Message):
                     await bot.invoke(ctx)
                 else:
                     # Fallback if context creation fails
-                    await message.reply("⚠️ Failed to process mention. Try using `^reason -m` instead.", mention_author=False)
+                    await message.reply("⚠️ Failed to process mention. Try using `^reason -s` instead.", mention_author=False)
             finally:
                 # Restore original message content
                 message.content = original_content
@@ -2152,8 +2154,8 @@ async def on_message(message: discord.Message):
             return  # Don't process as regular command
                 
         except Exception as e:
-            logger.error(f"Failed to process bot mention as reason -m: {e}")
-            await message.reply("⚠️ Failed to process mention. Try using `^reason -m` instead.", mention_author=False)
+            logger.error(f"Failed to process bot mention as reason -s: {e}")
+            await message.reply("⚠️ Failed to process mention. Try using `^reason -s` instead.", mention_author=False)
             return
     
     # Fun easter egg for bot interactions
