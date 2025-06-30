@@ -1,0 +1,34 @@
+# Runtime dependencies for Meri Bot
+# Core Discord bot functionality
+discord.py>=2.3.0,<3.0.0
+
+# Environment configuration
+python-dotenv>=1.0.0
+
+# HTTP requests and async networking
+requests>=2.31.0
+aiohttp>=3.8.0
+
+# Media processing and downloads
+yt-dlp>=2023.10.0
+
+# Web search and content extraction
+duckduckgo-search>=3.9.0
+
+# YouTube transcript extraction
+youtube-transcript-api>=0.6.0
+
+# Image processing and computer vision
+Pillow>=10.0.0
+
+# PDF processing (with fallback support)
+PyPDF2>=3.0.0
+
+# Optional: Alternative PDF library if PyPDF2 fails
+pypdf>=3.0.0
+
+# Audio/video processing (optional but recommended)
+# Note: Requires FFmpeg binary to be installed separately
+# On Windows: Download from https://ffmpeg.org/download.html
+# On Linux: sudo apt install ffmpeg
+# On macOS: brew install ffmpeg 
