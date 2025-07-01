@@ -444,7 +444,7 @@ def chunk_text(text: str, chunk_size: int = 1900) -> List[str]:
     """Split long text into Discord-friendly chunks (under 2000 char limit)."""
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
-async def _send_limited(ctx: commands.Context, text: str, max_posts: int = 5):
+async def _send_limited(ctx: commands.Context, text: str, max_posts: int = 5) -> None:
     """Send text in chunks, limiting total messages to prevent spam."""
     chunks = chunk_text(text)
     if not chunks:
@@ -461,7 +461,7 @@ async def _send_limited(ctx: commands.Context, text: str, max_posts: int = 5):
     for chunk in chunks:
         await ctx.send(f"```{chunk}```")
 
-async def _dynamic_prefix(bot_inst: commands.Bot, message: discord.Message):
+async def _dynamic_prefix(bot_inst: commands.Bot, message: discord.Message) -> str:
     """Dynamic prefix: humans use normal prefix, other bots use ^^^ to avoid conflicts."""
     if message.author.bot and message.author != bot_inst.user:
         return "^^^"  # Other bots use triple caret
@@ -551,6 +551,11 @@ from vis import setup_vis_commands
 
 # Import sum commands module (will be registered in on_ready)
 from sum import setup_sum_commands
+
+# Import profile picture commands modules (will be registered in on_ready)
+from serverpfp import setup_serverpfp_commands
+from userpfp import setup_user_commands
+from perms import setup_perms_commands
 
 # ─── Command Queue System ───────────────────────────────────────────────────
 # Prevents command conflicts by ensuring only one command runs at a time
@@ -653,12 +658,12 @@ async def _replying_send(self: _BaseContext, *args, **kwargs):  # type: ignore[o
 _BaseContext.send = _replying_send  # type: ignore[assignment]
 
 @bot.before_invoke
-async def _queue_before_invoke(ctx):
+async def _queue_before_invoke(ctx) -> None:
     """Acquire command lock before any command starts."""
     await _COMMAND_LOCK.acquire()
 
 @bot.after_invoke
-async def _queue_after_invoke(ctx):
+async def _queue_after_invoke(ctx) -> None:
     """Release command lock after command completes."""
     if _COMMAND_LOCK.locked():
         _COMMAND_LOCK.release()
@@ -667,8 +672,8 @@ async def _queue_after_invoke(ctx):
 # Stores conversation history and context per user for context-aware responses
 # Includes robust helper functions to prevent universal context access bugs
 
-_user_memory: dict[int, List[dict[str, str]]] = {}  # {user_id: [{"role": "user/assistant", "content": "..."}]}
-_user_context: dict[int, str] = {}  # {user_id: "last_response"} for cross-command context
+_user_memory: Dict[int, List[Dict[str, str]]] = {}  # {user_id: [{"role": "user/assistant", "content": "..."}]}
+_user_context: Dict[int, str] = {}  # {user_id: "last_response"} for cross-command context
 
 MEMORY_TURNS = 5  # Keep last 5 conversation turns per user (10 messages total)
 
@@ -685,7 +690,7 @@ def _get_user_context(user_id: int) -> str:
     logger.debug(f"Retrieved context for user {user_id}: {len(context)} characters")
     return context
 
-def _set_user_context(user_id: int, content: str):
+def _set_user_context(user_id: int, content: str) -> None:
     """Safely set context for a specific user."""
     if not isinstance(user_id, int):
         logger.error(f"Invalid user_id type for context storage: {type(user_id)} (expected int)")
@@ -698,7 +703,7 @@ def _set_user_context(user_id: int, content: str):
     _user_context[user_id] = content
     logger.debug(f"Stored context for user {user_id}: {len(content)} characters")
 
-def _get_user_memory(user_id: int) -> List[dict[str, str]]:
+def _get_user_memory(user_id: int) -> List[Dict[str, str]]:
     """Safely get conversation history for a specific user."""
     if not isinstance(user_id, int):
         logger.error(f"Invalid user_id type for memory access: {type(user_id)} (expected int)")
@@ -708,7 +713,7 @@ def _get_user_memory(user_id: int) -> List[dict[str, str]]:
     logger.debug(f"Retrieved memory for user {user_id}: {len(memory)} messages")
     return memory
 
-def _clear_user_context(user_id: int):
+def _clear_user_context(user_id: int) -> None:
     """Clear context for a specific user."""
     if not isinstance(user_id, int):
         logger.error(f"Invalid user_id type for context clearing: {type(user_id)} (expected int)")
@@ -720,7 +725,7 @@ def _clear_user_context(user_id: int):
     else:
         logger.debug(f"No context to clear for user {user_id}")
 
-def _clear_user_memory(user_id: int):
+def _clear_user_memory(user_id: int) -> None:
     """Clear conversation history for a specific user."""
     if not isinstance(user_id, int):
         logger.error(f"Invalid user_id type for memory clearing: {type(user_id)} (expected int)")
@@ -740,7 +745,7 @@ def _has_user_context(user_id: int) -> bool:
     
     return user_id in _user_context and bool(_user_context[user_id].strip())
 
-def _get_context_stats() -> dict:
+def _get_context_stats() -> Dict[str, Any]:
     """Get statistics about stored contexts (for debugging)."""
     stats = {
         'total_users_with_context': len(_user_context),
@@ -751,7 +756,7 @@ def _get_context_stats() -> dict:
     return stats
 
 # Enhanced remember function with better validation
-def _remember(user_id: int, role: str, content: str):
+def _remember(user_id: int, role: str, content: str) -> None:
     """Add a message to user's conversation memory, auto-trimming old entries."""
     if not isinstance(user_id, int):
         logger.error(f"Invalid user_id type for memory storage: {type(user_id)} (expected int)")
@@ -778,7 +783,7 @@ def _remember(user_id: int, role: str, content: str):
 
 # ─── Video/Audio Processing Helpers ──────────────────────────────────────────
 
-def _get_ytdl_opts():
+def _get_ytdl_opts() -> Dict[str, Any]:
     """Get basic yt_dlp options without authentication"""
     return {
         "format": "bestaudio/best",  # Prefer best audio quality
@@ -788,7 +793,7 @@ def _get_ytdl_opts():
         "extract_flat": "in_playlist",  # Don't download full playlist info
     }
 
-def _yt_dl_extract(url: str):
+def _yt_dl_extract(url: str) -> Any:
     """Extract video/audio info from YouTube URL using yt-dlp."""
     if yt_dlp is None:
         raise RuntimeError("yt_dlp not available")
@@ -1704,97 +1709,70 @@ async def _get_content_text(url: str) -> str:
 async def help_command(ctx):
     """Display available commands with clear, concise usage information."""
     
-    # Split help into two parts to stay under Discord's 2000 character limit
-    help_part1 = f"""
-🤖 **Meri Bot Commands** (Part 1/2)
-**Prefix:** `{PREFIX}` or `/` (slash commands)
+    help_text = f"""
+🤖 **Meri Bot Commands**
+**Prefix:** `{PREFIX}` or `/`
 
-🧠 **Main Commands**
-• `{PREFIX}reason <question>` - AI chat with optional auto-search
-• `{PREFIX}lm <prompt>` - Vision AI (images + videos)  
-• `{PREFIX}sum <url>` - Summarize web/PDF/text content
-• `{PREFIX}search <query>` - Search web + AI summary
-• `{PREFIX}vis <content>` - Analyze visual content
+🧠 **AI Commands**
+• `{PREFIX}reason <question>` - AI chat with web search
+• `{PREFIX}lm <prompt>` - Vision AI (images/videos)
+• `{PREFIX}sum <url>` - Summarize content
+• `{PREFIX}search <query>` - Web search
 
-🔧 **Modifiers**
-• `-m` - Reply to message for context/auto-search
-• `-vis` - Analyze video frames (needs FFmpeg)
-• `-s` - Add auto web search (reason) or manual search (lm)
+🖼️ **Avatar Commands**
+• `{PREFIX}userpfp [user]` - Get profile picture
+• `{PREFIX}serverpfp [user]` - Get server avatar
+• `{PREFIX}pfp` / `{PREFIX}avatar` - Shortcuts
 
 🎵 **Music Commands**
-• `{PREFIX}join` / `{PREFIX}play <url>` - Join/play music
-• `{PREFIX}skip` / `{PREFIX}pause` / `{PREFIX}resume` - Control playback
-• `{PREFIX}queue` / `{PREFIX}volume <0-100>` - Queue/volume
-• `{PREFIX}leave` / `{PREFIX}voice` - Leave/check status
+• `{PREFIX}play <url>` - Play music
+• `{PREFIX}skip` / `{PREFIX}pause` / `{PREFIX}resume` - Controls
+• `{PREFIX}queue` / `{PREFIX}leave` - Queue/leave
 
-📝 **Examples**
-• `{PREFIX}reason -s what is quantum computing` - Auto-search and answer
-• `{PREFIX}reason -m` - Ask about replied message with search
-• `{PREFIX}lm -vis` - Analyze attached video
-• `{PREFIX}sum -m` - Summarize link from reply
+🔧 **Utility Commands**
+• `{PREFIX}perms [channel]` - Check bot permissions
+• `{PREFIX}allperms` - Show all permissions
 
-Type `{PREFIX}help2` for troubleshooting commands and tips!
+🔧 **Modifiers**
+• `-m` - Reply to message for context
+• `-s` - Add web search
+• `-vis` - Analyze video frames
+
+**Examples:**
+• `{PREFIX}reason -s quantum computing` - Search & answer
+• `{PREFIX}lm -vis` - Analyze video
+• `{PREFIX}userpfp @user` - Get avatar
 """
     
-    help_part2 = f"""
-🤖 **Meri Bot Commands** (Part 2/2)
-
-🔧 **Troubleshooting Commands**
-• `{PREFIX}joinraw` - Raw join bypassing validation
-• `{PREFIX}contextstats` - Check per-user context isolation
-• `{PREFIX}clearcontext [user_id]` - Clear your context/memory (owner: others)
-
-ℹ️ **Features**
-• **Memory:** 5 conversation turns per user
-• **Supports:** Images, videos, YouTube/Shorts, X/Twitter, Wikipedia, PDF, text files
-• **Models:** Auto-unload after 1 minute
-• **React with ❌** to delete bot messages
-
-💡 **Tips**
-• Combine modifiers: `{PREFIX}lm -m -vis -s cats`
-• If voice handshake works but disconnects: try `{PREFIX}joinraw`
-• For voice connection issues, try the `{PREFIX}joinraw` command
-
-🎵 **More Music:** `{PREFIX}stop`, `{PREFIX}loop`, `{PREFIX}nowplaying`, `{PREFIX}musicsearch`
-"""
-    
-    # Send first part
-    await ctx.send(help_part1.strip())
-    
-    # Store second part for help2 command
-    ctx.bot._help_part2 = help_part2.strip()
+    await ctx.send(help_text.strip())
 
 @bot.hybrid_command(name="help2", description="Show troubleshooting commands and advanced features")
 async def help2_command(ctx):
-    """Display the second part of help with troubleshooting commands."""
-    # Get the stored second part or regenerate it
-    stored_help = getattr(bot, '_help_part2', None)
-    if stored_help:
-        await ctx.send(stored_help)
-    else:
-        # Fallback if not stored
-        help_part2 = f"""
-🤖 **Meri Bot Commands** (Part 2/2)
+    """Display troubleshooting commands and tips."""
+    
+    help2_text = f"""
+🤖 **Meri Bot - Troubleshooting & Tips**
 
-🔧 **Troubleshooting Commands**
-• `{PREFIX}joinraw` - Raw join bypassing validation
-• `{PREFIX}contextstats` - Check per-user context isolation
-• `{PREFIX}clearcontext [user_id]` - Clear your context/memory (owner: others)
-
-ℹ️ **Features**
-• **Memory:** 5 conversation turns per user
-• **Supports:** Images, videos, YouTube/Shorts, X/Twitter, Wikipedia, PDF, text files
-• **Models:** Auto-unload after 1 minute
-• **React with ❌** to delete bot messages
+🔧 **Troubleshooting**
+• `{PREFIX}joinraw` - Fix voice connection issues
+• `{PREFIX}contextstats` - Check memory stats
+• `{PREFIX}clearcontext` - Clear your memory
 
 💡 **Tips**
-• Combine modifiers: `{PREFIX}lm -m -vis -s cats`
-• If voice handshake works but disconnects: try `{PREFIX}joinraw`
-• For voice connection issues, try the `{PREFIX}joinraw` command
+• Combine modifiers: `{PREFIX}lm -m -vis -s`
+• React with ❌ to delete bot messages
+• Models auto-unload after 1 minute
 
-🎵 **More Music:** `{PREFIX}stop`, `{PREFIX}loop`, `{PREFIX}nowplaying`, `{PREFIX}musicsearch`
+🎵 **More Music**
+• `{PREFIX}stop` / `{PREFIX}loop` / `{PREFIX}nowplaying`
+• `{PREFIX}volume <0-100>` / `{PREFIX}musicsearch`
+
+ℹ️ **Supports**
+• Images, videos, YouTube, Twitter, PDFs
+• 5 conversation turns memory per user
 """
-        await ctx.send(help_part2.strip())
+    
+    await ctx.send(help2_text.strip())
 
 # ─── Admin Commands ─────────────────────────────────────────────────────────
 
@@ -2072,7 +2050,7 @@ async def clear_context_admin(ctx, user_id: Optional[int] = None):
 # ─── Event Handlers ──────────────────────────────────────────────────────────
 
 @bot.event
-async def on_command_error(ctx, error):
+async def on_command_error(ctx, error) -> None:
     """Handle command errors gracefully with user-friendly messages."""
     if isinstance(error, commands.CommandNotFound):
         return await ctx.send(f"❌ Unknown command. Use `{PREFIX}help`.")
@@ -2101,7 +2079,7 @@ async def on_command_error(ctx, error):
     await ctx.send("⚠️ Internal error. Please try again later.")
 
 @bot.event
-async def on_message(message: discord.Message):
+async def on_message(message: discord.Message) -> None:
     """Handle incoming messages and process commands."""
     # Ignore own messages to prevent infinite loops
     if message.author == bot.user:
@@ -2167,7 +2145,7 @@ async def on_message(message: discord.Message):
     await bot.process_commands(message)
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     """Bot startup sequence: sync commands and display connection info."""
     print(f"{bot.user} has connected to Discord!")
     print(f"Bot is in {len(bot.guilds)} guilds")
@@ -2236,6 +2214,20 @@ async def on_ready():
         await bot.add_cog(sum_commands)
         print("Sum commands cog registered successfully")
         
+        # Register profile picture commands cogs
+        serverpfp_commands = setup_serverpfp_commands(bot)
+        await bot.add_cog(serverpfp_commands)
+        print("Server profile picture commands cog registered successfully")
+        
+        user_commands = setup_user_commands(bot)
+        await bot.add_cog(user_commands)
+        print("Profile picture commands cog registered successfully")
+        
+        # Register permission commands cog
+        perms_commands = setup_perms_commands(bot)
+        await bot.add_cog(perms_commands)
+        print("Permission commands cog registered successfully")
+        
         # Sync slash commands globally (takes up to 1 hour to appear everywhere)
         print("Starting global slash command sync...")
         synced = await bot.tree.sync()
@@ -2260,7 +2252,7 @@ async def on_ready():
         print(f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=3148864&scope=bot%20applications.commands")
 
 @bot.event
-async def on_reaction_add(reaction, user):
+async def on_reaction_add(reaction, user) -> None:
     """Handle reaction-based message deletion.
     
     If someone reacts with ❌ (:x:) to a bot message, delete that message.
